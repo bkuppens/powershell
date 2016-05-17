@@ -20,11 +20,7 @@
 	Specifies the port.
 	
 .EXAMPLE
-	PS > Add-SQLServerAlias -Name "sp2010" -SQLServerName "sp2010" -Port 1433
-
-	Description
-	-----------
-	Creates a new SQL Server alias "sp2010" for SQL Server "sp2010" on port 1433.
+	PS > Add-SQLServerAlias -Name "SHPDB" -SQLServerName "SRV-CTG-SQL01" -Port 1433
 #>
 
 [CmdletBinding()]
@@ -37,12 +33,12 @@ param(
 	[string]$Port
 )	
 
-[string]$hive = "localmachine"
-[string]$Key = "SOFTWARE\\Microsoft\\MSSQLServer\\Client\\ConnectTo"
+$hive = "localmachine"
+$key = "SOFTWARE\\Microsoft\\MSSQLServer\\Client\\ConnectTo"
 
 $reg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]$hive, $env:COMPUTERNAME)
 
-$subkey = $reg.OpenSubKey($Key, $true)
+$subkey = $reg.OpenSubKey($key, $true)
 $res = $subkey.GetValue($Name)
 if (!$res)
 {
