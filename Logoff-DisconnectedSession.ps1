@@ -8,13 +8,17 @@
 .NOTES
    File Name: Logoff-DisconnectedSession.ps1
    Author   : Bart Kuppens
-   Version  : 1.0
+   Version  : 1.1
 
 .EXAMPLE
    PS > .\Logoff-DisconnectedSession.ps1
 #>
 
-$LogFile = "C:\Users\administrator\AppData\Local\DisconnectedSessions\sessions_" + $([DateTime]::Now.ToString('yyyyMMdd')) + ".log"
+function Ensure-LogFilePath([string]$LogFilePath)
+{
+    if (!(Test-Path -Path $LogFilePath)) {New-Item $LogFilePath -ItemType directory >> $null}
+}
+
 function Write-Log([string]$message)
 {
    Out-File -InputObject $message -FilePath $LogFile -Append
@@ -54,6 +58,9 @@ function Get-Sessions
       }
    }
 }
+
+Ensure-LogFilePath($ENV:LOCALAPPDATA + "\DisconnectedSessions")
+$LogFile = $ENV:LOCALAPPDATA + "\DisconnectedSessions\" + "sessions_" + $([DateTime]::Now.ToString('yyyyMMdd')) + ".log"
 
 [string]$IncludeStates = '^(Disc)$'
 Write-Log -Message "Disconnected Sessions CleanUp"
