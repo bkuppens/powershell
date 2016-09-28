@@ -15,7 +15,7 @@
 .NOTES
     File Name: Configure-Farm.ps1
     Author   : Bart Kuppens
-    Version  : 2.2
+    Version  : 2.3
 	
 .PARAMETER DatabaseServer
     The name of the server where the configuration database will be created.
@@ -88,10 +88,10 @@ if ($SPVersion -eq "2016")
     {
         0 { $ServerRole = "Custom" }
         1 { $ServerRole = "WebFrontEnd" }
-        2 { $ServerRole = "SingleServerFarm" }
-        3 { $ServerRole = "Search" }
-        4 { $ServerRole = "Application" }
-        5 { $ServerRole = "DistributedCache" }
+        2 { $ServerRole = "Application" }
+        3 { $ServerRole = "DistributedCache" }
+        4 { $ServerRole = "SingleServerFarm" }
+        5 { $ServerRole = "Search" }
     }
 }
 
