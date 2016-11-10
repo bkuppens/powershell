@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 	Join a server in an existing SharePoint farm.
 
@@ -7,8 +7,8 @@
 
 .NOTES
 	File Name: Join-Farm.ps1
-	Author   : Bart Kuppens
-	Version  : 2.3
+	Author   : Bart Kuppens - CTG Belgium
+	Version  : 2.5
 	
 .PARAMETER DBServer
 	Specifies the name of the database server where the configuration database of the farm is located.
@@ -19,22 +19,79 @@
 .PARAMETER PassPhrase
 	The Farm passphrase.
 
-.PARAMETER SPVersion
-    	Specifies the version of SharePoint (2010, 2013, or 2016)
+.PARAMETER SP2010
+    Specified when a new farm is created for SharePoint 2010.
+
+.PARAMETER SP2013
+    Specified when a new farm is created for SharePoint 2013.
+
+.PARAMETER SP2016
+    Specified when a new farm is created for SharePoint 2016.
+
+.PARAMETER IsDistributedCacheHost
+    Specified when this server will be a Distributed Cache Host.
+    For SP2016 farms, this parameter is only important when a "Custom" ServerRole is required and this local server needs to be
+    a DistributedCache server.
+
+.PARAMETER ServerRole
+    Specifies the role of the first server in the new farm.
+    Possible values: Custom, WebFrontEnd, Application, DistributedCache, SingleServerFarm, Search, 
+                     ApplicationWithSearch, WebFrontEndWithDistributedCache
+    
+    IMPORTANT!!! The roles 'ApplicationWithSearch' and 'WebFrontEndWithDistributionCache' are only valid 
+                 when Feature Pack 1 has been installed (KB3127940 & KB3127942)
 
 .EXAMPLE
-        PS > .\Join-Farm.ps1 -DBServer SHPDB -DBName SharePoint_Config_DB -PassPhrase "blabla" -SPVersion 2016
-#>
+    PS > .\Join-Farm.ps1 -DBServer SHPDB -DBName SharePoint_Config_DB -PassPhrase "blabla" -SP2010
 
+    DESCRIPTION
+    -----------
+    Will create a new SharePoint 2010 farm.
+
+.EXAMPLE
+    PS > .\Join-Farm.ps1 -DBServer SHPDB -DBName SharePoint_Config_DB -PassPhrase "blabla" -SP2013
+
+    DESCRIPTION
+    -----------
+    Will create a new SharePoint 2013 farm but will not configure the current server as a DistributedCache Host
+
+.EXAMPLE
+    PS > .\Join-Farm.ps1 -DBServer SHPDB -DBName SharePoint_Config_DB -PassPhrase "blabla" -SP2016 -ServerRole Search
+
+    DESCRIPTION
+    -----------
+    Will create a new SharePoint 2016 farm and give it a "Search" server role.
+
+#>
+[CmdletBinding()]
 param(
-	[parameter(Position=0,Mandatory=$true,ValueFromPipeline=$false)]
-	[string]$DBServer,
-	[parameter(Position=1,Mandatory=$true,ValueFromPipeline=$false)]
-	[string]$DBName,
-	[parameter(Position=2,Mandatory=$true,ValueFromPipeline=$false)]
-	[string]$PassPhrase,
-    [parameter(Position=5,Mandatory=$true,ValueFromPipeline=$false)]
-	[ValidateSet("2010","2013","2016")]$SPVersion
+    [parameter(ParameterSetName="2010",Mandatory=$true,ValueFromPipeLine=$false)]
+    [parameter(ParameterSetName="2013",Mandatory=$true,ValueFromPipeLine=$false)]
+    [parameter(ParameterSetName="2016",Mandatory=$true,ValueFromPipeLine=$false)]
+    [ValidateNotNullOrEmpty()]
+    [string]$DBServer,
+    [parameter(ParameterSetName="2010",Mandatory=$true,ValueFromPipeLine=$false)]
+    [parameter(ParameterSetName="2013",Mandatory=$true,ValueFromPipeLine=$false)]
+    [parameter(ParameterSetName="2016",Mandatory=$true,ValueFromPipeLine=$false)]
+    [ValidateNotNullOrEmpty()]
+    [string]$DBName,
+    [parameter(ParameterSetName="2010",Mandatory=$true,ValueFromPipeLine=$false)]
+    [parameter(ParameterSetName="2013",Mandatory=$true,ValueFromPipeLine=$false)]
+    [parameter(ParameterSetName="2016",Mandatory=$true,ValueFromPipeLine=$false)]
+    [ValidateNotNullOrEmpty()]
+    [string]$PassPhrase,
+    [parameter(ParameterSetName="2010",Mandatory=$true,ValueFromPipeLine=$false)]
+    [switch]$SP2010,
+    [parameter(ParameterSetName="2013",Mandatory=$true,ValueFromPipeLine=$false)]
+    [switch]$SP2013,
+    [parameter(ParameterSetName="2016",Mandatory=$true,ValueFromPipeLine=$false)]
+    [switch]$SP2016,
+    [parameter(ParameterSetName="2013",Mandatory=$false,ValueFromPipeLine=$false)]
+    [parameter(ParameterSetName="2016",Mandatory=$false,ValueFromPipeLine=$false)]
+    [switch]$IsDistributedCacheHost,
+    [parameter(ParameterSetName="2016",Mandatory=$true,ValueFromPipeLine=$false)]
+    [ValidateSet("Custom","WebFrontEnd","Application","DistributedCache","SingleServerFarm","Search","ApplicationWithSearch","WebFrontEndWithDistributedCache")]
+    [string]$ServerRole
 )
 
 # Load the SharePoint PowerShell snapin if needed
@@ -45,108 +102,75 @@ if ((Get-PSSnapin -Name Microsoft.SharePoint.PowerShell -ErrorAction SilentlyCon
 
 $SecurePassPhrase = ConvertTo-SecureString $PassPhrase -AsPlainText -Force
 
-# If SP2016 is targeted, ask for the serverrole for this server (default = WebFrontEnd)
-if ($SPVersion -eq "2016")
-{
-    $choices = [System.Management.Automation.Host.ChoiceDescription[]]@("&Custom","&WebFrontEnd", "&Application", "&DistributedCache", "S&ingleServerFarm","S&earch")
-    $default = 1
-    $choiceValue = $host.UI.PromptForChoice("Server Role","Specify the role for this server",$choices,$default)
-    switch($choiceValue)
-    {
-        0 { $ServerRole = "Custom" }
-        1 { $ServerRole = "WebFrontEnd" }
-        2 { $ServerRole = "Application" }
-        3 { $ServerRole = "DistributedCache" }
-        4 { $ServerRole = "SingleServerFarm" }
-        5 { $ServerRole = "Search" }
-    }
-}
-
-# If SP2013 or SP2016 is targeted, ask if this first server will be a DistributedCache Host or not (default = Yes)
-$IsDistributedCacheHost = $false
-if ($SPVersion -eq "2013" -or $SPVersion -eq "2016")
-{
-	$choices = [System.Management.Automation.Host.ChoiceDescription[]]@("&Yes","&No")
-	$default = 0
-	$choiceValue = $host.UI.PromptForChoice("Distributed Cache","Do you want this server to act as a Distributed Cache Host?",$choices,$default)
-	if ($choiceValue -eq 0)
-	{
-		$IsDistributedCacheHost = $true
-	}
-	else
-	{
-		$IsDistributedCacheHost = $false
-	}
-}
-
 try 
 {
-	Write-Host "Joining the farm..."
-    if ($SPVersion -eq "2016")
+    Write-Host "Joining the farm..."
+    if ($SP2016)
     {
-		if ($IsDistributedCacheHost)
-		{
-			Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase -LocalServerRole $ServerRole
-		}
-		else
-		{
-			Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase -LocalServerRole $ServerRole -SkipRegisterAsDistributedCacheHost
-		}
+        if ($IsDistributedCacheHost)
+        {
+            Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase -LocalServerRole $ServerRole
+        }
+        else
+        {
+            Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase -LocalServerRole $ServerRole -SkipRegisterAsDistributedCacheHost
+        }
     }
     else
     {
-		if ($SPVersion -eq "2013")
-		{
-			if ($IsDistributedCacheHost)
-			{
-				Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase
-			}
-			else
-			{
-				Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase -SkipRegisterAsDistributedCacheHost
-			}
-		}
-		else
-		{
-			Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase
-		}
+        if ($SP2013)
+        {
+            if ($IsDistributedCacheHost)
+            {
+                Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase
+            }
+            else
+            {
+                Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase -SkipRegisterAsDistributedCacheHost
+            }
+        }
+        else
+        {
+            Connect-SPConfigurationDatabase -DatabaseServer $DBServer -DatabaseName $DBName -PassPhrase $SecurePassPhrase
+        }
     }
-	Write-Host "Installing Help"
-	Install-SPHelpCollection -All
 
-	Write-Host "Securing SharePoint resources"
-	Initialize-SPResourceSecurity
+    Write-Host "Installing Help"
+    Install-SPHelpCollection -All
 
-	Write-Host "Installing services"
-	Install-SPService
+    Write-Host "Securing SharePoint resources"
+    Initialize-SPResourceSecurity
 
-	Write-Host "Installing features"
-	Install-SPFeature -AllExistingFeatures
+    Write-Host "Installing services"
+    Install-SPService
 
-	Write-Host "Installing application content"
-	Install-SPApplicationContent
+    Write-Host "Installing features"
+    Install-SPFeature -AllExistingFeatures
 
-	# Start Services if needed
-	Write-Host "Checking status SharePoint Timer service"
-	$timersvc = Get-Service SPTimerV4
-	if ($timersvc.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running)
-	{
-		Write-Host "   SharePoint Timer Service not running... starting the service"
-		$timersvc.Start()
-	}
+    Write-Host "Installing application content"
+    Install-SPApplicationContent
 
-	if (($SPVersion -eq "2013" -or $SPVersion -eq "2016") -and ($IsDistributedCacheHost))
-	{
-		Write-Host "Checking status Distributed Cache Service"
-		$distributedCacheSvc = Get-Service AppFabricCachingService
-		if ($distributedCacheSvc.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running)
-		{
-			Write-Host "   AppFabric Caching Service not running... starting the service"
-			$distributedCacheSvc.Start()
-		}
-	}
+    # Start Services if needed
+    Write-Host "Checking status SharePoint Timer service"
+    $timersvc = Get-Service SPTimerV4
+    if ($timersvc.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running)
+    {
+        Write-Host "   SharePoint Timer Service not running... starting the service"
+        $timersvc.Start()
+    }
+
+    if (($SPVersion -eq "2013" -or $SPVersion -eq "2016") -and ($IsDistributedCacheHost))
+    {
+        Write-Host "Checking status Distributed Cache Service"
+        $distributedCacheSvc = Get-Service AppFabricCachingService
+        if ($distributedCacheSvc.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running)
+        {
+            Write-Host "   AppFabric Caching Service not running... starting the service"
+            $distributedCacheSvc.Start()
+        }
+    }
 } 
 catch 
 {
-	Write-Host "Server was not joined in the farm"
+    Write-Host "Server was not joined in the farm"
 }
