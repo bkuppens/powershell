@@ -1,14 +1,15 @@
 ﻿<#
 .SYNOPSIS
-    Adds a SQL Server alias to the current server.
+    Adds a SQL Server alias to a server.  Defaults to local machine if not provided.
 	
 .DESCRIPTION
-    Adds a SQL Server alias to the current server.
+    Adds a SQL Server alias to a server.  Defaults to local machine if not provided.
 	
 .NOTES
     File Name: Add-SQLServerAlias.ps1
     Author   : Bart Kuppens
-    Version  : 2.0
+    Updates  : BillRob
+    Version  : 3.0
 	
 .PARAMETER Name
     Specifies the name of the alias.
@@ -21,9 +22,15 @@
 
 .PARAMETER Machine
     Specifies the computer where the registry is located.
+
+.PARAMETER x64
+    Specifies whether the alias should be created for 64 bit.
+
+.PARAMETER overrideIfExists
+    Specifies whether, if exist, the value will be overridden.
 	
 .EXAMPLE
-    PS > Add-SQLServerAlias -Name "SHPDB" -SQLServerName "SRV-CTG-SQL01" -Port 1433 -Machine SRV-CTG-SHP01
+    PS > Add-SQLServerAlias -Name "SHPDB" -SQLServerName "SRV-CTG-SQL01" -Port 1433 -Machine SRV-CTG-SHP01 -x64 0
 #>
 
 [CmdletBinding()]
@@ -35,11 +42,26 @@ param(
     [parameter(Position=2,Mandatory=$true,ValueFromPipeline=$false,HelpMessage="Specifies the port.")]
     [string]$Port,
     [parameter(Position=3,Mandatory=$false,ValueFromPipeline=$false,HelpMessage="Specifies the computer where the registry is located.")]
-    [string]$Machine
+    [string]$Machine,
+    [parameter(Position=4,Mandatory=$false,ValueFromPipeline=$false,HelpMessage="Specifies whether the alias should be created for 64 bit.")]
+    [bool]$x64,
+    [parameter(Position=5,Mandatory=$false,ValueFromPipeline=$false,HelpMessage="Specifies whether, if exist, the value will be overridden.")]
+    [bool]$overrideIfExists
 )
 
+$parentKeyx86 = "SOFTWARE\\Microsoft\\MSSQLServer\\Client\\"
+$parentKeyx64 = "SOFTWARE\\Wow6432Node\\Microsoft\\MSSQLServer\\Client\\"
+
 $hive = "localmachine"
-$parentKey = "SOFTWARE\\Microsoft\\MSSQLServer\\Client\\"
+if($x64 -eq $true)
+{
+    $parentKey = $parentKeyx64
+}
+else
+{
+    $parentKey = $parentKeyx86
+}
+
 $key = "ConnectTo"
 
 # If the $Machine parameter was not provided, use the local machine.
@@ -86,13 +108,21 @@ if ($subkey -eq $null)
 }
 
 $res = $subkey.GetValue($Name)
-if (!$res)
+if (!$res -or $overrideIfExists)
 {
     $subkey.SetValue($Name,"DBMSSOCN,$SQLServerName,$Port")
-    Write-Output "Alias $Name created successfully!"
+    if (!$res)
+    {
+        Write-Output "Alias '$Name' created successfully!"
+    }
+    else
+    {
+        Write-Output "Alias '$Name' updated successfully!"
+    }
+    
 }
 else
 {
-    Write-Output "Alias $Name already exists"
+    Write-Output "Alias '$Name' already exists, consider using overrideIfExists parameter"
 }
 $reg.Close()
