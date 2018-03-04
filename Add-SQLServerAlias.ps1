@@ -30,7 +30,7 @@
     Specifies whether, if exist, the value will be overridden.
 	
 .EXAMPLE
-    PS > Add-SQLServerAlias -Name "SHPDB" -SQLServerName "SRV-CTG-SQL01" -Port 1433 -Machine SRV-CTG-SHP01 -x64 0
+    PS > Add-SQLServerAlias -Name "SHPDB" -SQLServerName "SRV-CTG-SQL01" -Port 1433 -Machine SRV-CTG-SHP01 -x64
 #>
 
 [CmdletBinding()]
@@ -44,16 +44,16 @@ param(
     [parameter(Position=3,Mandatory=$false,ValueFromPipeline=$false,HelpMessage="Specifies the computer where the registry is located.")]
     [string]$Machine,
     [parameter(Position=4,Mandatory=$false,ValueFromPipeline=$false,HelpMessage="Specifies whether the alias should be created for 64 bit.")]
-    [bool]$x64,
+    [switch]$x64,
     [parameter(Position=5,Mandatory=$false,ValueFromPipeline=$false,HelpMessage="Specifies whether, if exist, the value will be overridden.")]
-    [bool]$overrideIfExists
+    [switch]$overrideIfExists
 )
 
 $parentKeyx86 = "SOFTWARE\\Microsoft\\MSSQLServer\\Client\\"
 $parentKeyx64 = "SOFTWARE\\Wow6432Node\\Microsoft\\MSSQLServer\\Client\\"
 
 $hive = "localmachine"
-if($x64 -eq $true)
+if($x64.IsPresent)
 {
     $parentKey = $parentKeyx64
 }
@@ -108,7 +108,7 @@ if ($subkey -eq $null)
 }
 
 $res = $subkey.GetValue($Name)
-if (!$res -or $overrideIfExists)
+if (!$res -or $overrideIfExists.IsPresent)
 {
     $subkey.SetValue($Name,"DBMSSOCN,$SQLServerName,$Port")
     if (!$res)
