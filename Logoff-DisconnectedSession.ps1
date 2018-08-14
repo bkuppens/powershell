@@ -8,11 +8,19 @@
 .NOTES
    File Name: Logoff-DisconnectedSession.ps1
    Author   : Bart Kuppens
-   Version  : 1.1
+   Version  : 1.2
 
+.PARAMETER ExcludeUsers
+    Specifies a comma-delimited list of users which should be excluded from being disconnected
+    
 .EXAMPLE
-   PS > .\Logoff-DisconnectedSession.ps1
+   PS > .\Logoff-DisconnectedSession.ps1 -ExcludeUsers "jdoe,wsmith,glang"
 #>
+[CmdletBinding()] 
+param( 
+    [Parameter(Mandatory=$false,ValueFromPipeline=$false)] 
+    [string]$ExcludeUsers
+)
 
 function Ensure-LogFilePath([string]$LogFilePath)
 {
@@ -62,6 +70,15 @@ function Get-Sessions
 Ensure-LogFilePath($ENV:LOCALAPPDATA + "\DisconnectedSessions")
 $LogFile = $ENV:LOCALAPPDATA + "\DisconnectedSessions\" + "sessions_" + $([DateTime]::Now.ToString('yyyyMMdd')) + ".log"
 
+if (![string]::IsNullOrEmpty($ExcludeUsers))
+{
+   $users = $ExcludeUsers.Split(',')
+}
+else
+{
+   $users = $null
+}
+
 [string]$IncludeStates = '^(Disc)$'
 Write-Log -Message "Disconnected Sessions CleanUp"
 Write-Log -Message "============================="
@@ -70,8 +87,15 @@ Write-Log -Message "Logged off sessions"
 Write-Log -Message "-------------------"
 foreach ($session in $DisconnectedSessions)
 {
-   logoff $session.ID
-   Write-Log -Message $session.Username
+   if (!$users -contains $session.Username)
+   {
+      logoff $session.ID
+      Write-Log -Message $session.Username
+   }
+   else
+   {
+      Write-Log -Message "$($session.Username) excluded"
+   }
 }
 Write-Log -Message " "
 Write-Log -Message "Finished"
