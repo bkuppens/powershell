@@ -8,7 +8,7 @@
 .NOTES
    File Name: Logoff-DisconnectedSession.ps1
    Author   : Bart Kuppens
-   Version  : 1.2
+   Version  : 1.3
 
 .PARAMETER ExcludeUsers
     Specifies a comma-delimited list of users which should be excluded from being disconnected
@@ -87,7 +87,7 @@ Write-Log -Message "Logged off sessions"
 Write-Log -Message "-------------------"
 foreach ($session in $DisconnectedSessions)
 {
-   if (!$users -contains $session.Username)
+   if (!($users -contains $session.Username))
    {
       logoff $session.ID
       Write-Log -Message $session.Username
